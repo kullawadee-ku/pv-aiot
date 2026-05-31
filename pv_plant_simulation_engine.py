@@ -8,7 +8,7 @@
 # 
 # https://www.g-set.education
 # Version : 1.0.0
-# License : MIT
+# License : MIT 
 # =====================================================================
 from datetime import datetime, timedelta
 import csv
@@ -62,9 +62,9 @@ class SeasonPreset:
 
     # Representative reference dates (used for solar geometry via day-of-year)
     SEASON_DATES = {
-        'summer': datetime(2026, 4, 15),   # mid-April: hottest, clearest
-        'rainy':  datetime(2026, 8, 15),   # mid-August: peak monsoon
-        'winter': datetime(2026, 1, 15),   # mid-January: coolest, driest
+        'summer': datetime(2026, 4, 15),   # mid-April: hottest, clearest (Wednesday)
+        'rainy':  datetime(2026, 8, 19),   # mid-August: peak monsoon     (Wednesday)
+        'winter': datetime(2026, 1, 21),   # mid-January: coolest, driest (Wednesday)
     }
 
     # ── BASE (shared hardware / location / TOU — unchanged across seasons) ──
@@ -645,7 +645,17 @@ def set_seed(seed: int = 42) -> None:
 # =====================================================================
 # 🚀 CONVENIENCE RUNNER  (call this from your notebook)
 # =====================================================================
-def run_season(season: str, time_resolution_mins: float = 5.0, **override_params) -> list:
+def _nearest_weekday(dt: datetime) -> datetime:
+    """Shift dt forward to the nearest Monday–Friday if it falls on a weekend."""
+    while dt.weekday() >= 5:   # 5=Saturday, 6=Sunday
+        dt += timedelta(days=1)
+    return dt
+
+
+def run_season(season: str,
+               time_resolution_mins: float = 5.0,
+               force_weekday: bool = True,
+               **override_params) -> list:
     """
     Convenience function: build engine from a SeasonPreset and simulate one full day.
 
@@ -653,6 +663,9 @@ def run_season(season: str, time_resolution_mins: float = 5.0, **override_params
     ----------
     season               : 'summer' | 'rainy' | 'winter'
     time_resolution_mins : time step in minutes (default 5)
+    force_weekday        : if True (default), shift reference date to nearest weekday
+                           so On-Peak TOU rates always apply — prevents accidental
+                           weekend Off-Peak simulations skewing cost comparisons.
     **override_params    : any SeasonPreset parameter to override, e.g. cloud_mean=0.8
 
     Returns
@@ -667,9 +680,11 @@ def run_season(season: str, time_resolution_mins: float = 5.0, **override_params
     """
     params = SeasonPreset.get(season)
     params['time_resolution_mins'] = time_resolution_mins
-    params.update(override_params)                         # apply any overrides
+    params.update(override_params)
     engine = TelemetryGenerator(**params)
     ref    = SeasonPreset.get_reference_date(season)
+    if force_weekday:
+        ref = _nearest_weekday(ref)
     start  = ref.replace(hour=0,  minute=0)
     end    = ref.replace(hour=23, minute=55)
     return simulate_time_range(engine, start, end, season_label=season)
@@ -688,6 +703,7 @@ def run_days(season: str,
 
     The cloud cover state carries over between days (Markov continuity),
     so the simulation behaves as one continuous run — not n independent days.
+    TOU rates are applied correctly per weekday/weekend for each day automatically.
 
     Parameters
     ----------
@@ -716,9 +732,8 @@ def run_days(season: str,
     engine = TelemetryGenerator(**params)
 
     if start_date is None:
-        start_date = SeasonPreset.get_reference_date(season).replace(hour=0, minute=0)
-    else:
-        start_date = start_date.replace(hour=0, minute=0)
+        start_date = SeasonPreset.get_reference_date(season)
+    start_date = start_date.replace(hour=0, minute=0)
 
     end_date = start_date + timedelta(days=n_days) - timedelta(minutes=time_resolution_mins)
 
