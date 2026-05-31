@@ -171,8 +171,12 @@ class SeasonPreset:
             'wind_speed_mean_ms':  3.0,
             'wind_speed_std_ms':   0.7,
             # Building load: lowest A/C demand
+            # load_shape2_std narrowed (1.8 vs default 2.5) so the evening
+            # peak drops faster — Bangkok winter nights cool down quicker,
+            # reducing A/C runtime. Fixes cost ordering: winter < rainy < summer.
             'base_load':           0.08,
             'peak_load':           1.6,
+            'load_shape2_std':     1.8,
         },
     }
 
