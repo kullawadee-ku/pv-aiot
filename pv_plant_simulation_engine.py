@@ -404,6 +404,7 @@ def simulate_time_range(generator: TelemetryGenerator,
             'timestamp':        current.strftime('%Y-%m-%d %H:%M:%S'),
             'season':           season_label,
             'hour':             round(hour, 2),
+            'time_step_hours':  round(generator.time_step_hours, 6),
             'cloud_cover':      round(generator.cloud_cover, 3),
             'cos_zenith':       round(geo['cos_zenith'], 4),
             'irradiance_wm2':   irr,
@@ -586,7 +587,7 @@ def get_financial_summary(season: str, dataset: list) -> dict:
     """
     total_grid_kwh = sum(d['grid_energy_kwh']              for d in dataset)
     total_cost_thb = sum(d['cost_thb']                     for d in dataset)
-    total_pv_kwh   = sum(d['pv_generation_kw'] * (5/60)   for d in dataset)
+    total_pv_kwh   = sum(d['pv_generation_kw'] * d['time_step_hours'] for d in dataset)
     avg_irr        = sum(d['irradiance_wm2']               for d in dataset) / len(dataset)
     avg_temp       = sum(d['ambient_temp_c']               for d in dataset) / len(dataset)
     peak_pv_kw     = max(d['pv_generation_kw']             for d in dataset)
@@ -680,13 +681,15 @@ def run_season(season: str,
     """
     params = SeasonPreset.get(season)
     params['time_resolution_mins'] = time_resolution_mins
-    params.update(override_params)
+    params.update(override_params)   # override_params may override time_resolution_mins
     engine = TelemetryGenerator(**params)
     ref    = SeasonPreset.get_reference_date(season)
     if force_weekday:
         ref = _nearest_weekday(ref)
-    start  = ref.replace(hour=0,  minute=0)
-    end    = ref.replace(hour=23, minute=55)
+    start  = ref.replace(hour=0, minute=0)
+    # Compute end as start + 1 day - 1 step (works for any resolution)
+    resolved_mins = params['time_resolution_mins']
+    end    = start + timedelta(hours=24) - timedelta(minutes=resolved_mins)
     return simulate_time_range(engine, start, end, season_label=season)
 
 
@@ -728,13 +731,15 @@ def run_days(season: str,
     """
     params = SeasonPreset.get(season)
     params['time_resolution_mins'] = time_resolution_mins
-    params.update(override_params)
+    params.update(override_params)   # override_params may override time_resolution_mins
     engine = TelemetryGenerator(**params)
 
     if start_date is None:
         start_date = SeasonPreset.get_reference_date(season)
     start_date = start_date.replace(hour=0, minute=0)
 
-    end_date = start_date + timedelta(days=n_days) - timedelta(minutes=time_resolution_mins)
+    # Use resolved time_resolution_mins from params (may be overridden by override_params)
+    resolved_mins = params['time_resolution_mins']
+    end_date = start_date + timedelta(days=n_days) - timedelta(minutes=resolved_mins)
 
     return simulate_time_range(engine, start_date, end_date, season_label=season)
