@@ -259,11 +259,22 @@ class TelemetryGenerator:
         self.load_lpf_alpha     = params.get('load_lpf_alpha', 0.75)
         self.last_building_load = self.base_load
 
-        self.area             = params.get('area', 27.78)
         self.eta_stc          = params.get('eta_stc', 0.18)
         self.temp_coeff_power = params.get('temp_coeff_power', -0.004)
         self.stc_ref_cell_temp_c    = params.get('stc_ref_cell_temp_c', 25.0)
         self.stc_ref_irradiance_wm2 = params.get('stc_ref_irradiance_wm2', 1000.0)
+
+        # pv_capacity_kw is a user-friendly shortcut.
+        # If specified, it overrides 'area' by back-calculating:
+        #   area = pv_capacity_kw / (eta_stc × G_STC/1000)
+        #        = pv_capacity_kw / eta_stc          (since G_STC = 1000 W/m²)
+        # If not specified, 'area' is used directly (default 27.78 m² ≈ 5 kWp).
+        pv_capacity_kw = params.get('pv_capacity_kw', None)
+        if pv_capacity_kw is not None:
+            self.area = pv_capacity_kw / self.eta_stc
+            print(f"[PV] pv_capacity_kw={pv_capacity_kw} kWp → area={self.area:.2f} m²")
+        else:
+            self.area = params.get('area', 27.78)
 
     # ── Solar Geometry ───────────────────────────────────────────────
     def _solar_geometry(self, dt: datetime) -> dict:
