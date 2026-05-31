@@ -553,22 +553,60 @@ def plot_season_comparison(season_datasets: dict, save_img: str = None):
 # =====================================================================
 # 📋 FINANCIAL SUMMARY
 # =====================================================================
-def print_financial_summary(season: str, dataset: list):
-    total_kwh    = sum(d['grid_energy_kwh'] for d in dataset)
-    total_thb    = sum(d['cost_thb']        for d in dataset)
-    total_pv_kwh = sum(d['pv_generation_kw'] * (5/60) for d in dataset)
-    avg_irr      = sum(d['irradiance_wm2']  for d in dataset) / len(dataset)
-    avg_temp     = sum(d['ambient_temp_c']  for d in dataset) / len(dataset)
-    max_pv       = max(d['pv_generation_kw'] for d in dataset)
+def get_financial_summary(season: str, dataset: list) -> dict:
+    """
+    Calculate and return financial/energy summary as a dict.
+    No side effects — does not print anything.
+
+    Returns
+    -------
+    dict with keys:
+        season, avg_irradiance_wm2, avg_temp_c, peak_pv_kw,
+        total_pv_kwh, total_grid_kwh, total_cost_thb
+
+    Example
+    -------
+    s = get_financial_summary('summer', data)
+    payback = 180_000 / s['total_cost_thb'] / 365
+    """
+    total_grid_kwh = sum(d['grid_energy_kwh']              for d in dataset)
+    total_cost_thb = sum(d['cost_thb']                     for d in dataset)
+    total_pv_kwh   = sum(d['pv_generation_kw'] * (5/60)   for d in dataset)
+    avg_irr        = sum(d['irradiance_wm2']               for d in dataset) / len(dataset)
+    avg_temp       = sum(d['ambient_temp_c']               for d in dataset) / len(dataset)
+    peak_pv_kw     = max(d['pv_generation_kw']             for d in dataset)
+
+    return {
+        'season':             season,
+        'avg_irradiance_wm2': round(avg_irr,       1),
+        'avg_temp_c':         round(avg_temp,       1),
+        'peak_pv_kw':         round(peak_pv_kw,     3),
+        'total_pv_kwh':       round(total_pv_kwh,   2),
+        'total_grid_kwh':     round(total_grid_kwh, 2),
+        'total_cost_thb':     round(total_cost_thb, 2),
+    }
+
+
+def print_financial_summary(season: str, dataset: list) -> None:
+    """
+    Print a formatted financial summary to stdout.
+    For downstream calculations, use get_financial_summary() instead.
+
+    Example
+    -------
+    print_financial_summary('summer', data)   # human-readable output
+    s = get_financial_summary('summer', data) # machine-readable dict
+    """
+    s = get_financial_summary(season, dataset)
     print(f"\n{'='*62}")
-    print(f"  📊  {season.upper()} SEASON — DAILY FINANCIAL SUMMARY")
+    print(f"  {s['season'].upper()} SEASON — DAILY FINANCIAL SUMMARY")
     print(f"{'='*62}")
-    print(f"  Avg Solar Irradiance   : {avg_irr:>8.1f} W/m²")
-    print(f"  Avg Ambient Temp       : {avg_temp:>8.1f} °C")
-    print(f"  Peak PV Output         : {max_pv:>8.3f} kW")
-    print(f"  Total PV Generation    : {total_pv_kwh:>8.2f} kWh")
-    print(f"  Total Grid Import      : {total_kwh:>8.2f} kWh")
-    print(f"  Total TOU Cost         : {total_thb:>8.2f} THB")
+    print(f"  Avg Solar Irradiance   : {s['avg_irradiance_wm2']:>8.1f} W/m²")
+    print(f"  Avg Ambient Temp       : {s['avg_temp_c']:>8.1f} °C")
+    print(f"  Peak PV Output         : {s['peak_pv_kw']:>8.3f} kW")
+    print(f"  Total PV Generation    : {s['total_pv_kwh']:>8.2f} kWh")
+    print(f"  Total Grid Import      : {s['total_grid_kwh']:>8.2f} kWh")
+    print(f"  Total TOU Cost         : {s['total_cost_thb']:>8.2f} THB")
     print(f"{'='*62}")
 
 
